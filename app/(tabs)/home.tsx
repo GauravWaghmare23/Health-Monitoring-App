@@ -1,7 +1,7 @@
 import { client, CollectionId, database, DatabaseId } from "@/lib/appwrite";
 import React, { useEffect, useRef, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
-import { Query } from "appwrite";
+import { Query } from "react-native-appwrite";
 import { Card, Paragraph, Searchbar, Text } from "react-native-paper";
 
 type UserProfile = {

@@ -12,7 +12,7 @@ import {
     Text,
     View,
 } from "react-native";
-import { ID, Query } from "appwrite";
+import { ID, Query } from "react-native-appwrite";
 import {
     Button,
     Divider,

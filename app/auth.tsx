@@ -1,7 +1,7 @@
 import { useAuth } from "@/lib/auth-context";
 import React, { useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
-import { AppwriteException } from "appwrite";
+import { AppwriteException } from "react-native-appwrite";
 import { Button, Text, TextInput } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
