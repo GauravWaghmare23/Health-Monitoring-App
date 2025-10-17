@@ -1,0 +1,3 @@
+- [x] Modify signUp in lib/auth-context.tsx to create account and immediately log in, removing email verification
+- [x] Update error handling in app/auth.tsx to differentiate between signup and signin errors
+- [x] Test the authentication flow to ensure signup and signin work correctly
