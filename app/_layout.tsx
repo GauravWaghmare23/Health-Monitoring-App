@@ -11,7 +11,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (isLoading) return; // Don't do anything until loading is false.
+    if (isLoading) return; 
 
     const isAuthGroup = segments[0] === "auth";
 
@@ -20,7 +20,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     } else if (user && isAuthGroup) {
       router.replace("/(tabs)/home");
     }
-  }, [user, segments, isLoading]);
+  }, [user, segments, isLoading, router]);
 
   if (isLoading) {
     return <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}><ActivityIndicator size="large" /></View>;

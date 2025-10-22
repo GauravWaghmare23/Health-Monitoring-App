@@ -3,169 +3,179 @@ import { useAuth } from "@/lib/auth-context";
 import { Href, Link } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    Alert,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { ID, Query } from "react-native-appwrite";
 import {
-    Button,
-    Divider,
-    Surface,
-    Switch,
-    TextInput,
+  Button,
+  Switch,
+  TextInput,
+  ActivityIndicator,
+  Divider,
+  Surface,
 } from "react-native-paper";
-
-const SCREEN_WIDTH = Dimensions.get("window").width;
-
-type State = {
-  name: string;
-  email: string;
-  mobile: string;
-  age: string;
-  address: string;
-  city: string;
-  state: string;
-  pincode: string;
-  isPublic: boolean;
-};
-
-type Action = { type: "SET_FIELD"; field: keyof State; payload: any } | { type: "SET_STATE"; payload: Partial<State> };
-
-const formReducer = (state: State, action: Action): State => {
-  switch (action.type) {
-    case "SET_FIELD":
-      return { ...state, [action.field]: action.payload };
-    case "SET_STATE":
-      return { ...state, ...action.payload };
-    default:
-      return state;
-  }
-};
 
 export default function Profile() {
   const { user, logout } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [edit, setEdit] = useState(false);
-  const [docId, setDocId] = useState<string>("");
-  const [formState, dispatch] = React.useReducer(formReducer, { name: "", email: "", mobile: "", age: "", address: "", city: "", state: "", pincode: "", isPublic: true });
 
-  // For displaying update status
+  // 1. State for all form fields
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [age, setAge] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [stateName, setStateName] = useState(""); // Renamed to avoid collision with React state
+  const [pincode, setPincode] = useState("");
+  const [isPublic, setIsPublic] = useState(true);
+
+  // 2. Control states
+  const [loading, setLoading] = useState(true);
+  const [editMode, setEditMode] = useState(false);
+  const [docId, setDocId] = useState<string>("");
   const [updated, setUpdated] = useState(false);
 
+  // Theme for TextInputs
+  const inputTheme = {
+    colors: {
+      primary: "#18181c",
+      background: "#f7f8fa",
+      text: "#191819",
+    },
+  };
+
+  // --- Data Fetching and Initialization ---
   useEffect(() => {
     if (!user) return;
 
     const fetchOrCreateProfile = async () => {
       setLoading(true);
       try {
+        // Check if profile document exists for this user's email
         const resp = await database.listDocuments(
           DatabaseId,
           CollectionId,
           [Query.equal("email", user.email)]
         );
+
         if (resp.documents.length > 0) {
+          // Document found: Load existing data
           const data = resp.documents[0];
           setDocId(data.$id);
-          dispatch({ type: "SET_STATE", payload: {
-            name: user.name ?? "",
-            email: user.email ?? "",
-            mobile: data.mobile ?? "",
-            age: data.age?.toString() ?? "",
-            address: data.address ?? "",
-            city: data.city ?? "",
-            state: data.state ?? "",
-            pincode: data.pincode ?? "",
-            isPublic: data.isPublic ?? true,
-          }});
+          setName(data.name ?? user.name ?? "");
+          setEmail(data.email ?? user.email ?? "");
+          setMobile(data.mobile ?? "");
+          setAge(data.age?.toString() ?? "");
+          setAddress(data.address ?? "");
+          setCity(data.city ?? "");
+          setStateName(data.state ?? ""); // Use stateName
+          setPincode(data.pincode ?? "");
+          setIsPublic(data.isPublic ?? true);
         } else {
-          const newDoc = await database.createDocument(DatabaseId, CollectionId, ID.unique(), {
-            name: user.name,
-            email: user.email,
-            isPublic: true,
-          });
+          // No document found: Create a new one
+          const newDoc = await database.createDocument(
+            DatabaseId,
+            CollectionId,
+            ID.unique(),
+            {
+              name: user.name,
+              email: user.email,
+              isPublic: true,
+            }
+          );
           setDocId(newDoc.$id);
-          dispatch({ type: "SET_STATE", payload: {
-            name: user.name ?? "",
-            email: user.email ?? "",
-            mobile: newDoc.mobile ?? "",
-            age: newDoc.age?.toString() ?? "",
-            address: newDoc.address ?? "",
-            city: newDoc.city ?? "",
-            state: newDoc.state ?? "",
-            pincode: newDoc.pincode ?? "",
-            isPublic: newDoc.isPublic ?? true,
-          }});
+          setName(user.name ?? "");
+          setEmail(user.email ?? "");
+          setIsPublic(true);
+          // Other fields remain empty strings
         }
       } catch (err) {
-        Alert.alert("Error", "Failed to fetch or create profile data.");
+        console.error("Profile Fetch/Create Error:", err);
+        Alert.alert("Error", "Failed to load profile data.");
       }
       setLoading(false);
     };
     fetchOrCreateProfile();
   }, [user]);
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } catch {
-      Alert.alert("Logout Error", "Failed to logout. Please try again.");
-    }
-  };
-
+  // --- Handlers ---
   const handleUpdate = async () => {
     if (!docId) {
       Alert.alert("Error", "Profile document ID missing.");
       return;
     }
+    setLoading(true);
     try {
       await database.updateDocument(DatabaseId, CollectionId, docId, {
-        name: formState.name,
-        email: formState.email,
-        mobile: formState.mobile,
-        age: Number(formState.age) || 0,
-        address: formState.address,
-        city: formState.city,
-        state: formState.state,
-        pincode: formState.pincode,
-        isPublic: formState.isPublic,
+        name: name,
+        mobile: mobile,
+        age: Number(age) || 0, // Ensure age is a number
+        address: address,
+        city: city,
+        state: stateName, // Use stateName here
+        pincode: pincode,
+        isPublic: isPublic,
       });
-      // Only update name in auth service if it's not empty and has changed
-      if (formState.name && formState.name !== user?.name) {
-        await account.updateName(formState.name);
+
+      // Update Appwrite auth name if changed
+      if (name && name !== user?.name) {
+        await account.updateName(name);
       }
-      setEdit(false);
+
+      setEditMode(false);
       setUpdated(true);
       setTimeout(() => setUpdated(false), 1800);
     } catch (err: any) {
       Alert.alert("Update failed", err.message || "Unknown error");
     }
+    setLoading(false);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      Alert.alert("Logout Error", "Failed to logout.");
+    }
   };
 
   const handleResetPassword = async () => {
     try {
-      // This URL must be a configured deep link in your app.json/expo config.
-      // For example: "exp://192.168.1.10:8081/--/reset-password"
-      // You would then create a [..reset-password].tsx file to handle the logic.
-      await account.createRecovery(formState.email, `${Link.resolveHref('/(auth)/reset-password' as Href)}`);
+      // Ensure the deep link is correct for your setup
+      await account.createRecovery(email, `${Link.resolveHref('/(auth)/reset-password' as Href)}`);
       Alert.alert("Recovery Email Sent", "Check your email for password reset link.");
     } catch (err: any) {
       Alert.alert("Error", err.message || "Could not send password reset email.");
     }
   };
 
-  if (!user || loading) {
+  // --- Loading State ---
+  if (loading || !user) {
     return (
       <View style={styles.loadingContainer}>
+        <ActivityIndicator animating={true} color="#18181c" size="large" />
         <Text style={styles.loadingText}>Loading profile...</Text>
       </View>
     );
   }
+
+  // --- Helper function for Display Mode (Inline replacement for ProfileField) ---
+  const renderDisplayField = (label: string, value: string | boolean) => (
+    <View key={label} style={styles.fieldPair}>
+      <Text style={styles.displayLabel}>{label}</Text>
+      {typeof value === 'boolean' ? (
+        <Switch value={value} color="#222" disabled />
+      ) : (
+        <Text style={styles.displayValue}>{value ? value : "—"}</Text>
+      )}
+    </View>
+  );
 
   return (
     <KeyboardAvoidingView
@@ -176,41 +186,35 @@ export default function Profile() {
         <Surface style={styles.card}>
           <Text style={styles.sectionTitle}>My Profile</Text>
           {updated && (
-            <Text style={styles.updatedMessage}>Profile Updated!</Text>
+            <Text style={styles.updatedMessage}>Profile Updated! 🎉</Text>
           )}
-          {!edit ? (
+
+          {/* --- Display Mode --- */}
+          {!editMode ? (
             <>
-              <View style={styles.bigFieldRow}>
-                <View style={{ width: "50%" }}>
-                  <Text style={styles.displayLabel}>Name</Text>
-                  <Text style={styles.displayValue}>{formState.name}</Text>
-                </View>
-                <View style={{ width: "50%" }}>
-                  <Text style={styles.displayLabel}>Email</Text>
-                  <Text style={styles.displayValue}>{formState.email}</Text>
-                </View>
-              </View>
+              {renderDisplayField("Name", name)}
               <Divider style={styles.divider} />
-              <View style={styles.multiRow}>
-                <ProfileField label="Mobile" value={formState.mobile} />
-                <ProfileField label="Age" value={formState.age} />
-              </View>
+              {renderDisplayField("Email", email)}
               <Divider style={styles.divider} />
-              <ProfileField label="Address" value={formState.address} />
-              <ProfileField label="City" value={formState.city} />
-              <ProfileField label="State" value={formState.state} />
-              <ProfileField label="Pincode" value={formState.pincode} />
+              {renderDisplayField("Mobile", mobile)}
               <Divider style={styles.divider} />
-              <View style={styles.publicRow}>
-                <Text style={styles.displayLabel}>Show to Public</Text>
-                <Switch value={formState.isPublic} color="#222" disabled />
-              </View>
+              {renderDisplayField("Age", age)}
+              <Divider style={styles.divider} />
+              {renderDisplayField("Address", address)}
+              <Divider style={styles.divider} />
+              {renderDisplayField("City", city)}
+              <Divider style={styles.divider} />
+              {renderDisplayField("State", stateName)}
+              <Divider style={styles.divider} />
+              {renderDisplayField("Pincode", pincode)}
+              <Divider style={styles.divider} />
+              {renderDisplayField("Show to Public", isPublic)}
+
               <Button
                 mode="contained"
                 style={styles.editBtn}
                 labelStyle={styles.editBtnText}
-                contentStyle={styles.buttonContent}
-                onPress={() => setEdit(true)}
+                onPress={() => setEditMode(true)}
               >
                 Edit Details
               </Button>
@@ -218,7 +222,6 @@ export default function Profile() {
                 mode="outlined"
                 style={styles.logoutBtn}
                 labelStyle={styles.logoutBtnText}
-                contentStyle={styles.buttonContent}
                 onPress={handleLogout}
               >
                 Logout
@@ -228,39 +231,106 @@ export default function Profile() {
                 style={styles.resetBtn}
                 labelStyle={styles.resetBtnText}
                 onPress={handleResetPassword}
-                contentStyle={styles.buttonContent}
               >
                 Change Password
               </Button>
             </>
           ) : (
+            /* --- Edit Mode --- */
             <>
-              <BigTextInput label="Name" value={formState.name} onChangeText={(text: string) => dispatch({ type: 'SET_FIELD', field: 'name', payload: text })} />
-              <BigTextInput label="Email" value={formState.email} onChangeText={(text: string) => dispatch({ type: 'SET_FIELD', field: 'email', payload: text })} keyboardType="email-address" editable={false} />
-              <BigTextInput label="Mobile" value={formState.mobile} onChangeText={(text: string) => dispatch({ type: 'SET_FIELD', field: 'mobile', payload: text })} keyboardType="phone-pad" />
-              <BigTextInput label="Age" value={formState.age} onChangeText={(text: string) => dispatch({ type: 'SET_FIELD', field: 'age', payload: text })} keyboardType="numeric" />
-              <BigTextInput label="Address" value={formState.address} onChangeText={(text: string) => dispatch({ type: 'SET_FIELD', field: 'address', payload: text })} multiline />
-              <BigTextInput label="City" value={formState.city} onChangeText={(text: string) => dispatch({ type: 'SET_FIELD', field: 'city', payload: text })} />
-              <BigTextInput label="State" value={formState.state} onChangeText={(text: string) => dispatch({ type: 'SET_FIELD', field: 'state', payload: text })} />
-              <BigTextInput label="Pincode" value={formState.pincode} onChangeText={(text: string) => dispatch({ type: 'SET_FIELD', field: 'pincode', payload: text })} keyboardType="numeric" />
+              <TextInput
+                label="Name"
+                value={name}
+                onChangeText={setName}
+                style={styles.input}
+                theme={inputTheme}
+                mode="outlined"
+              />
+              <TextInput
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                editable={false}
+                style={styles.input}
+                theme={inputTheme}
+                mode="outlined"
+              />
+              <TextInput
+                label="Mobile"
+                value={mobile}
+                onChangeText={setMobile}
+                keyboardType="phone-pad"
+                style={styles.input}
+                theme={inputTheme}
+                mode="outlined"
+              />
+              <TextInput
+                label="Age"
+                value={age}
+                onChangeText={setAge}
+                keyboardType="numeric"
+                style={styles.input}
+                theme={inputTheme}
+                mode="outlined"
+              />
+              <TextInput
+                label="Address"
+                value={address}
+                onChangeText={setAddress}
+                multiline
+                style={styles.input}
+                theme={inputTheme}
+                mode="outlined"
+              />
+              <TextInput
+                label="City"
+                value={city}
+                onChangeText={setCity}
+                style={styles.input}
+                theme={inputTheme}
+                mode="outlined"
+              />
+              <TextInput
+                label="State"
+                value={stateName}
+                onChangeText={setStateName}
+                style={styles.input}
+                theme={inputTheme}
+                mode="outlined"
+              />
+              <TextInput
+                label="Pincode"
+                value={pincode}
+                onChangeText={setPincode}
+                keyboardType="numeric"
+                style={styles.input}
+                theme={inputTheme}
+                mode="outlined"
+              />
+
               <View style={styles.publicRow}>
                 <Text style={styles.displayLabel}>Show to Public</Text>
-                <Switch value={formState.isPublic} onValueChange={(val) => dispatch({ type: 'SET_FIELD', field: 'isPublic', payload: val })} color="#191819" />
+                <Switch
+                  value={isPublic}
+                  onValueChange={setIsPublic}
+                  color="#191819"
+                />
               </View>
+
               <Button
                 mode="contained"
                 style={styles.updateBtn}
                 labelStyle={styles.updateBtnText}
-                contentStyle={styles.buttonContent}
                 onPress={handleUpdate}
+                disabled={loading}
               >
-                Update
+                {loading ? "Saving..." : "Update"}
               </Button>
               <Button
                 mode="outlined"
                 style={styles.logoutBtn}
                 labelStyle={styles.logoutBtnText}
-                contentStyle={styles.buttonContent}
                 onPress={handleLogout}
               >
                 Logout
@@ -268,7 +338,7 @@ export default function Profile() {
               <Button
                 mode="text"
                 style={{ marginTop: 2 }}
-                onPress={() => setEdit(false)}
+                onPress={() => setEditMode(false)}
               >
                 Cancel
               </Button>
@@ -280,37 +350,7 @@ export default function Profile() {
   );
 }
 
-// Field Display Helper
-function ProfileField({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.fieldPair}>
-      <Text style={styles.displayLabel}>{label}</Text>
-      <Text style={styles.displayValue}>{value ? value : "—"}</Text>
-    </View>
-  );
-}
-
-// Oversized Input Helper
-function BigTextInput(props: any) {
-  return (
-    <TextInput
-      {...props}
-      style={[styles.bigInput, props.style]}
-      theme={inputTheme}
-      mode="outlined"
-    />
-  );
-}
-
-const inputTheme = {
-  colors: {
-    primary: "#222",
-    background: "#f7f8fa",
-    text: "#191819",
-    placeholder: "#a5acba",
-  },
-};
-
+// Simplified Styles
 const styles = StyleSheet.create({
   scroll: {
     backgroundColor: "#f7f8fa",
@@ -322,12 +362,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#f2f3f9",
+    backgroundColor: "#f7f8fa",
   },
   loadingText: {
     color: "#131313",
     fontWeight: "600",
-    fontSize: 22,
+    fontSize: 18,
+    marginTop: 10,
   },
   updatedMessage: {
     alignSelf: "center",
@@ -337,55 +378,43 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   card: {
-    width: SCREEN_WIDTH < 430 ? "98%" : 430,
+    width: "95%",
+    maxWidth: 430,
     backgroundColor: "#fff",
-    borderRadius: 24,
-    padding: 26,    
-    boxShadow: "0 7px 15px rgba(34, 34, 34, 0.12)",
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
     marginBottom: 20,
-    alignSelf: "center",
   },
   sectionTitle: {
-    fontSize: 21,
+    fontSize: 22,
     fontWeight: "700",
     color: "#18171b",
-    marginBottom: 22,
-    letterSpacing: 0.15,
+    marginBottom: 20,
   },
   divider: {
     backgroundColor: "#eceeef",
     height: 1,
-    marginVertical: 9,
-    width: "100%",
-    alignSelf: "center",
-  },
-  bigFieldRow: {
-    flexDirection: "row",
-    marginBottom: 2,
-    alignItems: "flex-start",
-  },
-  multiRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 0,
+    marginVertical: 1,
   },
   fieldPair: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 0,
-    marginBottom: 0,
+    paddingVertical: 14,
   },
   displayLabel: {
     color: "#5b5e6d",
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "500",
   },
   displayValue: {
     color: "#17181b",
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "600",
     maxWidth: "60%",
     textAlign: "right",
@@ -398,76 +427,63 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingHorizontal: 1,
   },
+  input: {
+    marginBottom: 15,
+    backgroundColor: "#f7f8fa",
+    borderRadius: 10,
+    fontSize: 16,
+    height: 55,
+  },
   editBtn: {
     backgroundColor: "#18181c",
-    borderRadius: 20,
-    minHeight: 56,
-    marginTop: 19,
-    marginBottom: 6,
+    borderRadius: 12,
+    minHeight: 50,
+    marginTop: 20,
+    marginBottom: 8,
     elevation: 0,
-    fontWeight: "700",
-    fontSize: 19,
     justifyContent: "center",
   },
   editBtnText: {
     color: "#fff",
     fontWeight: "700",
-    fontSize: 19,
-  },
-  logoutBtn: {
-    borderRadius: 20,
-    borderColor: "#232426",
-    borderWidth: 1.5,
-    backgroundColor: "#f9f9fa",
-    minHeight: 56,
-    marginBottom: 9,
-    marginTop: 2,
-    elevation: 0,
-  },
-  logoutBtnText: {
-    color: "#1b1b1c",
-    fontWeight: "700",
-    fontSize: 17,
-  },
-  bigInput: {
-    marginBottom: 17,
-    backgroundColor: "#f7f8fa",
-    borderRadius: 14,
-    fontSize: 19,
-    height: 59,
-    paddingLeft: 12,
-    paddingTop: 10,
-    borderColor: "#e1e2e6",
-    borderWidth: 1.1,
+    fontSize: 16,
   },
   updateBtn: {
     backgroundColor: "#191819",
-    borderRadius: 18,
-    marginTop: 10,
+    borderRadius: 12,
+    marginTop: 15,
     marginBottom: 7,
     elevation: 0,
-    width: "100%",
-    minHeight: 55,
+    minHeight: 50,
     justifyContent: "center",
   },
   updateBtnText: {
     color: "#fff",
     fontWeight: "700",
-    fontSize: 18,
+    fontSize: 16,
+  },
+  logoutBtn: {
+    borderRadius: 12,
+    borderColor: "#232426",
+    borderWidth: 1.5,
+    backgroundColor: "#f9f9fa",
+    minHeight: 50,
+    marginBottom: 9,
+    marginTop: 2,
+    elevation: 0,
+    justifyContent: "center",
+  },
+  logoutBtnText: {
+    color: "#1b1b1c",
+    fontWeight: "700",
+    fontSize: 16,
   },
   resetBtn: {
     marginTop: 5,
-    marginBottom: 3,
-    backgroundColor: "#fff",
-    borderColor: "#292d31",
-    borderWidth: 0,
   },
   resetBtnText: {
     color: "#2d2d2d",
     fontWeight: "700",
-    fontSize: 15.5,
-  },
-  buttonContent: {
-    height: 56,
+    fontSize: 15,
   },
 });
