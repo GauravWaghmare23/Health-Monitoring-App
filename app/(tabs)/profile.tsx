@@ -74,7 +74,7 @@ export default function Profile() {
           setAge(data.age?.toString() ?? "");
           setAddress(data.address ?? "");
           setCity(data.city ?? "");
-          setStateName(data.state ?? ""); // Use stateName
+          setStateName(data.state ?? ""); 
           setPincode(data.pincode ?? "");
           setIsPublic(data.isPublic ?? true);
         } else {
@@ -115,10 +115,10 @@ export default function Profile() {
       await database.updateDocument(DatabaseId, CollectionId, docId, {
         name: name,
         mobile: mobile,
-        age: Number(age) || 0, // Ensure age is a number
+        age: Number(age) || 0,
         address: address,
         city: city,
-        state: stateName, // Use stateName here
+        state: stateName,
         pincode: pincode,
         isPublic: isPublic,
       });
